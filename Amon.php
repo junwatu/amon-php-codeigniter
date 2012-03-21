@@ -9,40 +9,45 @@ require_once "Amon/AmonPhpWarning.php";
 
 class Amon
 {
-    static $exceptions;
+    protected  $exceptions;
 
-    static $previous_exception_handler;
-    static $previous_error_handler;
+    protected  $previous_exception_handler;
+    protected  $previous_error_handler;
 
-    static $controller;
-    static $action;
-    static $config_array;
+    protected  $controller;
+    protected  $action;
+    protected  $config_array;
+    protected  $amonremote;
+
+    public function __construct(){
+
+    }
 
     /**
      *  Overwrite the default configuration
      *  Amon::config(array('port', 'host', 'application_key'))
      *
      */
-    public static function config($array)
+    public function config($array)
     {
-        self::$config_array = (object)$array;
+        $this->config_array = (object)$array;
         // Construct the url
-        self::$config_array->url = sprintf("%s:%d", 
-            self::$config_array->host,
-            self::$config_array->port);
-
+        $this->config_array->url = sprintf("%s:%d",
+        $this->config_array->host,
+        $this->config_array->port);
+        $this->amonremote = new AmonRemote();
     }
 
     /** Check for the config array or default to /etc/amon.conf */
     private function _get_config_object()
     {
-        if(empty(self::$config_array))
+        if(empty($this->config_array))
         {
             $config = new AmonConfig();
         }
         else
         {
-            $config = self::$config_array;
+            $config = $this->config_array;
         }
 
         return $config;
@@ -57,34 +62,34 @@ class Amon
      *
      * @return void
      */
-    public static function log($message, $tags='')
+    public function log($message, $tags='')
     {
         $data = array(
             'message' => $message,
             'tags'  => $tags
         );
-        $config = self::_get_config_object();
+        $config = $this->_get_config_object();
         $log_url = sprintf("%s/api/log", $config->url);
         if($config->application_key){ 
             $log_url = sprintf("%s/%s", $log_url, $config->application_key);
         }
 
-        AmonRemote::request($log_url, $data);
+        $this->amonremote->request($log_url, $data);
     }
 
-    static function setup_exception_handler() 
+    public function setup_exception_handler()
     {
 
-        self::$exceptions = array();
-        self::$action = "";
-        self::$controller = "";
+       $this->exceptions = array();
+       $this->action = "";
+       $this->controller = "";
 
         // set exception handler & keep old exception handler around
-        self::$previous_exception_handler = set_exception_handler(
+       $this->previous_exception_handler = set_exception_handler(
             array("Amon", "handle_exception")
         );
 
-        self::$previous_error_handler = set_error_handler(
+       $this->previous_error_handler = set_error_handler(
             array("Amon", "handle_error")
         );
 
@@ -98,7 +103,7 @@ class Amon
     {
         if ($e = error_get_last()) 
         {
-            self::handle_error($e["type"], $e["message"], $e["file"], $e["line"]);
+            $this->handle_error($e["type"], $e["message"], $e["file"], $e["line"]);
         }
     }
 
@@ -131,10 +136,10 @@ class Amon
             $ex = new AmonPhpError($errstr, $errno, $errfile, $errline);
         }
 
-        self::handle_exception($ex, false);
+        $this->handle_exception($ex, false);
 
-        if (self::$previous_error_handler) {
-            call_user_func(self::$previous_error_handler, $errno, $errstr, $errfile, $errline);
+        if ($this->previous_error_handler) {
+            call_user_func($this->previous_error_handler, $errno, $errstr, $errfile, $errline);
         }
     }
     /*
@@ -144,20 +149,20 @@ class Amon
      */
     static function handle_exception($exception, $call_previous = true) 
     {
-        $config = self::_get_config_object();
+        $config = $this->_get_config_object();
         $exception_url = sprintf("%s/api/exception", $config->url);
         if($config->application_key){ 
             $exception_url = sprintf("%s/%s", $exception_url, $config->application_key);
         }
 
-        self::$exceptions[] = $exception;
+        $this->exceptions[] = $exception;
 
         $data = new AmonData($exception);
-        AmonRemote::request($exception_url, $data->data);
+        $this->amonremote->request($exception_url, $data->data);
 
         // if there's a previous exception handler, we call that as well
-        if ($call_previous && self::$previous_exception_handler) {
-            call_user_func(self::$previous_exception_handler, $exception);
+        if ($call_previous && $this->previous_exception_handler) {
+            call_user_func($this->previous_exception_handler, $exception);
         }
     }
 }

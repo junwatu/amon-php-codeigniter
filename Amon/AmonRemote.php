@@ -2,7 +2,9 @@
 
 class AmonRemote
 {
+    public function __construct(){
 
+    }
     /**
      * Make request
      *
@@ -12,7 +14,7 @@ class AmonRemote
      *
      * @return array
      */
-    public static function request($url, array $data, $referer='') 
+    public function request($url, array $data, $referer='')
     {
 
         $params = array(
