@@ -3,7 +3,7 @@ Amon PHP Client For CodeIgniter
 
 Install
 ------
-Put Amon.php and Amon folder in CodeIgniter application/libraries folder.
+Put Amon.php and Amon folder into CodeIgniter application/libraries folder.
 
 How To Use It
 -----------
