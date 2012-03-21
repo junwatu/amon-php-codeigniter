@@ -9,18 +9,17 @@ require_once "Amon/AmonPhpWarning.php";
 
 class Amon
 {
-    protected  $exceptions;
+    protected $exceptions;
+    protected $previous_exception_handler;
+    protected $previous_error_handler;
+    protected $controller;
+    protected $action;
+    protected $config_array;
+    protected $amonremote;
 
-    protected  $previous_exception_handler;
-    protected  $previous_error_handler;
-
-    protected  $controller;
-    protected  $action;
-    protected  $config_array;
-    protected  $amonremote;
-
-    public function __construct(){
-
+    public function __construct()
+    {
+        $this->amonremote = new AmonRemote();
     }
 
     /**
@@ -32,26 +31,20 @@ class Amon
     {
         $this->config_array = (object)$array;
         // Construct the url
-        $this->config_array->url = sprintf("%s:%d",
-        $this->config_array->host,
-        $this->config_array->port);
-        $this->amonremote = new AmonRemote();
+        $this->config_array->url = sprintf("%s:%d", $this->config_array->host, $this->config_array->port);
     }
 
     /** Check for the config array or default to /etc/amon.conf */
     private function _get_config_object()
     {
-        if(empty($this->config_array))
-        {
+        if (empty($this->config_array)) {
             $config = new AmonConfig();
         }
         else
         {
             $config = $this->config_array;
         }
-
         return $config;
-
     }
 
     /**
@@ -62,78 +55,55 @@ class Amon
      *
      * @return void
      */
-    public function log($message, $tags='')
+    public function log($message, $tags = '')
     {
         $data = array(
             'message' => $message,
-            'tags'  => $tags
+            'tags' => $tags
         );
         $config = $this->_get_config_object();
         $log_url = sprintf("%s/api/log", $config->url);
-        if($config->application_key){ 
+        if ($config->application_key) {
             $log_url = sprintf("%s/%s", $log_url, $config->application_key);
         }
 
         $this->amonremote->request($log_url, $data);
     }
 
-    public function setup_exception_handler()
+    public function shutdown()
     {
-
-       $this->exceptions = array();
-       $this->action = "";
-       $this->controller = "";
-
-        // set exception handler & keep old exception handler around
-       $this->previous_exception_handler = set_exception_handler(
-            array("Amon", "handle_exception")
-        );
-
-       $this->previous_error_handler = set_error_handler(
-            array("Amon", "handle_error")
-        );
-
-        register_shutdown_function(
-            array("Amon", "shutdown")
-        );
-    }
-
-
-    static function shutdown() 
-    {
-        if ($e = error_get_last()) 
-        {
+        if ($e = error_get_last()) {
             $this->handle_error($e["type"], $e["message"], $e["file"], $e["line"]);
         }
     }
 
-    static function handle_error($errno, $errstr, $errfile, $errline)
+    public function handle_error($errno, $errstr, $errfile, $errline)
     {
         if (!(error_reporting() & $errno)) {
             return;
         }
 
         switch ($errno) {
-        case E_NOTICE:
-        case E_USER_NOTICE:
-            $ex = new AmonPhpNotice($errstr, $errno, $errfile, $errline);
-            break;
+            case E_NOTICE:
+            case E_USER_NOTICE:
+                $ex = new AmonPhpNotice($errstr, $errno, $errfile, $errline);
+                break;
 
-        case E_WARNING:
-        case E_USER_WARNING:
-            $ex = new AmonPhpWarning($errstr, $errno, $errfile, $errline);
-            break;
+            case E_WARNING:
+            case E_USER_WARNING:
+                $ex = new AmonPhpWarning($errstr, $errno, $errfile, $errline);
+                break;
 
-        case E_STRICT:
-            $ex = new AmonPhpStrict($errstr, $errno, $errfile, $errline);
-            break;
+            case E_STRICT:
+                $ex = new AmonPhpStrict($errstr, $errno, $errfile, $errline);
+                break;
 
-        case E_PARSE:
-            $ex = new AmonPhpParse($errstr, $errno, $errfile, $errline);
-            break;
+            case E_PARSE:
+                $ex = new AmonPhpParse($errstr, $errno, $errfile, $errline);
+                break;
 
-        default:
-            $ex = new AmonPhpError($errstr, $errno, $errfile, $errline);
+            default:
+                $ex = new AmonPhpError($errstr, $errno, $errfile, $errline);
         }
 
         $this->handle_exception($ex, false);
@@ -142,16 +112,17 @@ class Amon
             call_user_func($this->previous_error_handler, $errno, $errstr, $errfile, $errline);
         }
     }
+
     /*
-     * Exception handle class. Pushes the current exception onto the exception
-     * stack and calls the previous handler, if it exists. Ensures seamless
-     * integration.
-     */
-    static function handle_exception($exception, $call_previous = true) 
+    * Exception handle class. Pushes the current exception onto the exception
+    * stack and calls the previous handler, if it exists. Ensures seamless
+    * integration.
+    */
+    function handle_exception($exception, $call_previous = true)
     {
         $config = $this->_get_config_object();
         $exception_url = sprintf("%s/api/exception", $config->url);
-        if($config->application_key){ 
+        if ($config->application_key) {
             $exception_url = sprintf("%s/%s", $exception_url, $config->application_key);
         }
 
@@ -165,5 +136,26 @@ class Amon
             call_user_func($this->previous_exception_handler, $exception);
         }
     }
+
+    public function setup_exception_handler()
+    {
+        $this->exceptions = array();
+        $this->action = "";
+        $this->controller = "";
+
+        // set exception handler & keep old exception handler around
+        $this->previous_exception_handler = set_exception_handler(
+            array($this, "handle_exception")
+        );
+
+        $this->previous_error_handler = set_error_handler(
+            array($this, "handle_error")
+        );
+
+        register_shutdown_function(
+            array($this, "shutdown")
+        );
+    }
 }
+
 
