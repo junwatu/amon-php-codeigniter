@@ -17,7 +17,7 @@ Load amonconfig.php into codeigniter system with
 
 	$this->load-config('amonconfig');
  
-or use config autoload feature from codeigniter with editing file autoload.php in application/config folder 
+or use config file autoload feature from codeigniter. To use this feature edit file autoload.php in application/config folder 
 
 	$autoload['config'] = array('amonconfig');
 
